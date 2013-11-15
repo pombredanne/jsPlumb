@@ -1,7 +1,7 @@
 /*
  * jsPlumb
  * 
- * Title:jsPlumb 1.4.1
+ * Title:jsPlumb 1.5.3
  * 
  * Provides a way to visually connect elements on an HTML page, using either SVG, Canvas
  * elements, or VML.  
@@ -32,8 +32,8 @@
 		onStep : null,
 		initialize : function(el, options) {
 			this.parent(el, options);
-			if (options['onStep']) {
-				this.onStep = options['onStep'];
+			if (options.onStep) {
+				this.onStep = options.onStep;
 			}
 		},
 		step : function(now) {
@@ -73,9 +73,9 @@
 			if (id) {
 				var options = _droppableOptions[id];
 				if (options) {
-					if (options['hoverClass']) {
-						if (entering) el.addClass(options['hoverClass']);
-						else el.removeClass(options['hoverClass']);
+					if (options.hoverClass) {
+						if (entering) el.addClass(options.hoverClass);
+						else el.removeClass(options.hoverClass);
 					}
 				}
 			}
@@ -112,7 +112,7 @@
 		 * adds the given class to the element object.
 		 */
 		addClass : function(el, clazz) {
-			el = jsPlumb.CurrentLibrary.getElementObject(el)						
+			el = jsPlumb.CurrentLibrary.getElementObject(el);
 			try {
 				if (el.className.constructor == SVGAnimatedString) {
 					jsPlumbUtil.svg.addClass(el, clazz);
@@ -138,6 +138,21 @@
 			el = _getElementObject(el);
 			el.addEvent(event, callback);
 		},
+
+		destroyDraggable : function(el) {
+			// TODO
+			var id = jsPlumb.getId(el), d = _draggablesById[id];
+			if (d) {
+				for (var i = 0; i < d.length; i++)
+					d[i].detach();
+
+				delete _draggablesById[id];
+			}
+		},
+
+		destroyDroppable : function(el) {
+			// TODO
+		},
 		
 		dragEvents : {
 			'start':'onStart', 'stop':'onComplete', 'drag':'onDrag', 'step':'onStep',
@@ -151,13 +166,6 @@
 		 */
 		extend : function(o1, o2) {
 			return $extend(o1, o2);
-		},
-		
-		/**
-		 * gets the named attribute from the given element object.  
-		 */
-		getAttribute : function(el, attName) {
-			return el.get(attName);
 		},
 		
 		getClientXY : function(eventObject) {
@@ -184,8 +192,9 @@
 		},
 		
 		getDOMElement : function(el) { 
+			if (el == null) return null;
 			// MooTools just decorates the DOM elements. so we have either an ID or an Element here.
-			return typeof(el) == "String" ? document.getElementById(el) : el; 
+			return typeof(el) == "string" ? document.getElementById(el) : el; 
 		},
 							
 		getElementObject : _getElementObject,
@@ -265,7 +274,7 @@
                     originalCursor = null,
 				    dragZIndex = jsPlumb.Defaults.DragOptions.zIndex || 2000;
                 
-				options['onStart'] = jsPlumb.wrap(options['onStart'], function() {
+				options.onStart = jsPlumbUtil.wrap(options.onStart, function() {
                     originalZIndex = this.element.getStyle('z-index');
 					this.element.setStyle('z-index', dragZIndex);
                     drag.originalZIndex = originalZIndex;
@@ -273,18 +282,20 @@
 						originalCursor = this.element.getStyle('cursor');
 						this.element.setStyle('cursor', jsPlumb.Defaults.DragOptions.cursor);
 					}
+					$(document.body).addClass(_jsPlumb.dragSelectClass);
 				});
 				
-				options['onComplete'] = jsPlumb.wrap(options['onComplete'], function() {
+				options.onComplete = jsPlumbUtil.wrap(options.onComplete, function() {
 					this.element.setStyle('z-index', originalZIndex);
 					if (originalCursor) {
 						this.element.setStyle('cursor', originalCursor);
 					}                    
+					$(document.body).removeClass(_jsPlumb.dragSelectClass);
 				});
 				
 				// DROPPABLES - only relevant if this is a plumbed component, ie. not just the result of the user making some DOM element
                 // draggable.  this is the only library adapter that has to care about this parameter.
-				var scope = "" + (options["scope"] || jsPlumb.Defaults.Scope),
+				var scope = "" + (options.scope || jsPlumb.Defaults.Scope),
 				    filterFunc = function(entry) {
 					    return entry.get("id") != el.get("id");
 				    },
@@ -292,20 +303,20 @@
 
                 if (isPlumbedComponent) {
 
-				    options['droppables'] = droppables;
-				    options['onLeave'] = jsPlumb.wrap(options['onLeave'], function(el, dr) {
+				    options.droppables = droppables;
+				    options.onLeave = jsPlumbUtil.wrap(options.onLeave, function(el, dr) {
 		    			if (dr) {
 			    			_checkHover(dr, false);
 				    		_executeDroppableOption(el, dr, 'onLeave');
 					    }
 				    });
-				    options['onEnter'] = jsPlumb.wrap(options['onEnter'], function(el, dr) {
+				    options.onEnter = jsPlumbUtil.wrap(options.onEnter, function(el, dr) {
 					    if (dr) {
 						    _checkHover(dr, true);
 						    _executeDroppableOption(el, dr, 'onEnter');
 					    }
 				    });
-				    options['onDrop'] = function(el, dr, event) {
+				    options.onDrop = function(el, dr, event) {
 					    if (dr) {
 						    _checkHover(dr, false);
 						    _executeDroppableOption(el, dr, 'onDrop', event);
@@ -313,7 +324,7 @@
 				    };
                 }
                 else
-                    options["droppables"] = [];
+                    options.droppables = [];
 				
 				drag = new Drag.Move(el, options);
 				drag.scope = scope;
@@ -330,7 +341,7 @@
 		},
 		
 		initDroppable : function(el, options, isPlumbedComponent, isPermanent) {
-			var scope = options["scope"];
+			var scope = options.scope;
             _add(_droppables, scope, el);
 			var id = jsPlumb.getId(el);
 
@@ -356,7 +367,7 @@
 		 * you need Drag.Move imported to make drop work.
 		 */
 		isDropSupported : function(el, options) {
-			return (typeof Drag != undefined && typeof Drag.Move != undefined);
+			return (typeof Drag !== undefined && typeof Drag.Move !== undefined);
 		},
 		
 		/**
@@ -380,16 +391,9 @@
             var el = _getElementObject(element);
 			if (el) el.dispose();  // ??
 		},
-		
-		/**
-		 * sets the named attribute on the given element object.  
-		 */
-		setAttribute : function(el, attName, attValue) {
-			el.set(attName, attValue);
-		},
 
 		setDragFilter : function(el, filter) {
-			jsPlumb.log("NOT IMPLEMENTED: setDragFilter")
+			jsPlumb.log("NOT IMPLEMENTED: setDragFilter");
 		},
 		
 		setDraggable : function(el, draggable) {
@@ -419,7 +423,7 @@
                 for (var j = 0; j < _draggablesById[i].length; j++) {
                     var d = _draggablesById[i][j];
                     d.stop();
-                    if (d.originalZIndex != 0)
+                    if (d.originalZIndex !== 0)
                         d.element.setStyle("z-index", d.originalZIndex);
                 }
             }

@@ -1,7 +1,7 @@
 /*
  * jsPlumb
  * 
- * Title:jsPlumb 1.4.1
+ * Title:jsPlumb 1.5.3
  * 
  * Provides a way to visually connect elements on an HTML page, using either SVG, Canvas
  * elements, or VML.  
@@ -24,7 +24,6 @@
  * bind					binds some event to an element
  * dragEvents			a dictionary of event names
  * extend				extend some js object with another.  probably not overly necessary; jsPlumb could just do this internally.
- * getAttribute			gets some attribute from an element
  * getDragObject		gets the object that is being dragged, by extracting it from the arguments passed to a drag callback
  * getDragScope			gets the drag scope for a given element.
  * getElementObject		turns an id or dom element into an element object of the underlying library's type.
@@ -40,7 +39,6 @@
  * isDropSupported		returns whether or not drop is supported for some element.
  * removeClass			removes a class from a given element.
  * removeElement		removes some element completely from the DOM.
- * setAttribute			sets an attribute on some element.
  * setDraggable			sets whether or not some element should be draggable.
  * setDragScope			sets the drag scope for a given element.
  * setOffset			sets the offset of some element.
@@ -124,9 +122,9 @@
 			if (id) {
 				var options = _droppableOptions[id];
 				if (options) {
-					if (options['hoverClass']) {
-						if (entering) el.addClass(options['hoverClass']);
-						else el.removeClass(options['hoverClass']);
+					if (options.hoverClass) {
+						if (entering) el.addClass(options.hoverClass);
+						else el.removeClass(options.hoverClass);
 					}
 				}
 			}
@@ -160,7 +158,7 @@
 		animate : function(el, properties, options) {
 			var o = _extend({node:el, to:properties}, options),			
 				id = _getAttribute(el, "id");
-			o["tween"] = jsPlumb.wrap(properties["tween"], function() {
+			o.tween = jsPlumbUtil.wrap(properties.tween, function() {
 				// TODO should use a current instance.
 				jsPlumb.repaint(id);
 			});
@@ -179,15 +177,27 @@
 		bind : function(el, event, callback) {
 			_getElementObject(el).on(event, callback);
 		},
+
+		destroyDraggable : function(el) {
+			var id = jsPlumb.getId(el),
+				dd = _draggablesById[id];
+
+			if (dd) {
+				dd.destroy();
+				delete _draggablesById[id];
+			}
+		},
+
+		destroyDroppable : function(el) {
+			// TODO
+		},
 			
 		dragEvents : {
 			"start":"drag:start", "stop":"drag:end", "drag":"drag:drag", "step":"step",
 			"over":"drop:enter", "out":"drop:exit", "drop":"drop:hit"
 		},								
 			
-		extend : _extend,
-		
-		getAttribute : _getAttribute,
+		extend : _extend,			
 		
 		getClientXY : function(eventObject) {
 			return [eventObject.clientX, eventObject.clientY];
@@ -219,8 +229,9 @@
 			return _droppableScopesById[id];
 		},
 		
-		getDOMElement : function(el) { 			
-			if (typeof(el) == "String") 
+		getDOMElement : function(el) { 	
+			if (el == null) return null;		
+			if (typeof(el) == "string") 
 				return document.getElementById(el);
 			else if (el._node) 
 				return el._node;
@@ -276,9 +287,9 @@
 		
 		getUIPosition : function(args, zoom) {
 			zoom = zoom || 1;
-			var n = args[0].currentTarget.el._node,
-			o = Y.DOM.getXY(n);
-			return {left:o[0] / zoom, top:o[1] / zoom};
+			var el = args[0].currentTarget.el._node || args[0].currentTarget.el;
+			var o = Y.DOM.getXY(el);
+			return {left:o[0] / zoom, top:o[1] / zoom };
 		},		
 		
 		hasClass : function(el, clazz) {
@@ -288,9 +299,16 @@
 		initDraggable : function(el, options, isPlumbedComponent, _jsPlumb) {
 			var _opts = _getDDOptions(options),
 				id = _jsPlumb.getId(el);
-			_opts.node = "#" + id;		
+			_opts.node = "#" + id;	
+			options["drag:start"] = jsPlumbUtil.wrap(options["drag:start"], function() {
+				Y.one(document.body).addClass(_jsPlumb.dragSelectClass);				
+			}, false);	
+			options["drag:end"] = jsPlumbUtil.wrap(options["drag:end"], function() {
+				Y.one(document.body).removeClass(_jsPlumb.dragSelectClass);
+			});	
 			var dd = new Y.DD.Drag(_opts), 
                 containment = options.constrain2node || options.containment;
+
 			dd.el = el;	
             
             if (containment) {
@@ -300,13 +318,12 @@
             }
 			
 			if (isPlumbedComponent) {
-				var scope = options['scope'] || _jsPlumb.Defaults.Scope;
+				var scope = options.scope || _jsPlumb.Defaults.Scope;
 				dd.scope = scope;
 				_add(_draggablesByScope, scope, dd);
 			}
 			
-			_draggablesById[id] = dd;			
-			
+			_draggablesById[id] = dd;						
 			_attachListeners(dd, options, ddEvents);
 		},
 		
@@ -319,17 +336,17 @@
 			_droppableOptions[id] = options;
 			
 			options = _extend({}, options);
-			var scope = options['scope'] || jsPlumb.Defaults.Scope;					
+			var scope = options.scope || jsPlumb.Defaults.Scope;					
 			_droppableScopesById[id] = scope;
 			
-			options["drop:enter"] = jsPlumb.wrap(options["drop:enter"], function(e) {
+			options["drop:enter"] = jsPlumbUtil.wrap(options["drop:enter"], function(e) {
 				if (e.drag.scope !== scope) return true;
 				_checkHover(el, true);
 			}, true);
-			options["drop:exit"] = jsPlumb.wrap(options["drop:exit"], function(e) {
+			options["drop:exit"] = jsPlumbUtil.wrap(options["drop:exit"], function(e) {
 				_checkHover(el, false);
 			});
-			options["drop:hit"] = jsPlumb.wrap(options["drop:hit"], function(e) {
+			options["drop:hit"] = jsPlumbUtil.wrap(options["drop:hit"], function(e) {
 				if (e.drag.scope !== scope) return true;
 				_checkHover(el, false);
 			}, true);
@@ -347,14 +364,10 @@
 		removeClass : function(el, clazz) { 
 			jsPlumb.CurrentLibrary.getElementObject(el).removeClass(clazz); 
 		},		
-		removeElement : function(el) { _getElementObject(el).remove(); },
-		
-		setAttribute : function(el, attributeName, attributeValue) {
-			el.setAttribute(attributeName, attributeValue);
-		},
+		removeElement : function(el) { _getElementObject(el).remove(); },		
 
 		setDragFilter : function(el, filter) {
-			jsPlumb.log("NOT IMPLEMENTED: setDragFilter")
+			jsPlumb.log("NOT IMPLEMENTED: setDragFilter");
 		},
 		
 		/**

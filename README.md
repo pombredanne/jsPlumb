@@ -1,5 +1,5 @@
 # jsPlumb
-jsPlumb provides a means for a developer to visually connect elements on their web pages. It uses SVG or Canvas in modern browsers, and VML on IE 8 and below. The latest version is 1.4.1.
+jsPlumb provides a means for a developer to visually connect elements on their web pages. It uses SVG or Canvas in modern browsers, and VML on IE 8 and below. The latest version is 1.5.3.
 
 The project started out life on Google Code and was hosted there up until April 30, 2013.  From May 1st, 2013, jsPlumb lives on GitHub only.
 
@@ -7,10 +7,12 @@ If you're new to jsPlumb, please do take the time to read the [documentation](ht
 There are a few integration issues that you should be aware of: z-index needs special attention, for example.
 
 ## Project Structure
-At any time there is a built version in the `build` directory, which contains the concatenated and minified files, as well as a full set of demos and tests, and there is a version under development in `src`.  If taking something that is working and adapting it for your needs is what you want to do, use the files in the `build` directory.  If you need to work directly with the version in development - maybe there's a bug fix you need or whatever - you need the files in the `src` directory.
+At any time there is a built version in the `dist` directory, which contains the concatenated and minified files, as well as a full set of demos and tests, and there is a version under development in `src`.  If taking something that is working and adapting it for your needs is what you want to do, use the files in the `dist` directory.  If you need to work directly with the version in development - maybe there's a bug fix you need or whatever - you need the files in the `src` directory.
 
 Note that the demos in the `demos` directory are always pointing at the current development version, and therefore have a long list of imports.  
 
+## Issues
+jsPlumb reluctantly uses GitHub's pedestrian issue tracker for enhancements and bugs.  But please do check the [Google Group](https://groups.google.com/forum/?fromgroups#!forum/jsplumb) before posting an issue, particularly if you're just asking a question.
 
 ## Requirements
 - jQuery:
@@ -24,7 +26,7 @@ This issue is fixed in jQuery 1.8.
 
 jsPlumb requires MooTools 1.3.x or 1.2.4 (tested on 1.3.2 and 1.2.4; it might work on other versions). To support
 dragging in MooTools, you will need Drag.Move from MooTools More. jsPlumb has been tested with Drag.Move from MooTools 
-More 1.3.2.1 and 1.2.4.4, but I would recommend using 1.3.2.1 as there were bugs on IE with the getPosition() 
+More 1.3.2.1 and 1.2.4.4, but I would recommend using 1.3.2.1 as there were bugs on IE with the `getPosition()` 
 function of MooTools, which the Drag.Move class uses.
 
 __Firefox 11 and MooTools 1.3.x do not play well together in SVG mode__ - see [this issue](https://github.com/mootools/mootools-core/issues/2331)
@@ -51,9 +53,15 @@ Documentation can be found in the doc folder of the project, or you can view it 
 
 API documentation is in the apidoc folder of the project, and online [here](http://jsplumb.org/apidocs/).
 
+## jsPlumb Helper Projects
+
 The Bezier curve functions used by jsPlumb have been extracted to a separate project:
 
 [https://github.com/sporritt/jsBezier](https://github.com/sporritt/jsBezier)
+
+...as have various simple geometry functions:
+
+[https://github.com/sporritt/jsplumb-geom](https://github.com/sporritt/jsplumb-geom)
 
 ## Tests
 Tests can be found [here](http://jsplumb.org/tests/all-tests.html)
