@@ -1,19 +1,16 @@
 /*
  * jsPlumb
  * 
- * Title:jsPlumb 1.5.3
+ * Title:jsPlumb 1.7.2
  * 
- * Provides a way to visually connect elements on an HTML page, using either SVG, Canvas
- * elements, or VML.  
+ * Provides a way to visually connect elements on an HTML page, using SVG or VML.  
  * 
- * This file contains the jsPlumb connector editors.  It is not deployed wth the released versions of jsPlumb; you need to
- * include it as an extra script.
+ * This file contains the jsPlumb connector editors.  It is experimental.
  *
- * Copyright (c) 2010 - 2013 Simon Porritt (simon.porritt@gmail.com)
+ * Copyright (c) 2010 - 2014 Simon Porritt (simon@jsplumbtoolkit.com)
  * 
- * http://jsplumb.org
+ * http://jsplumbtoolkit.com
  * http://github.com/sporritt/jsplumb
- * http://code.google.com/p/jsplumb
  * 
  * Dual licensed under the MIT and GPL2 licenses.
  */
@@ -22,6 +19,11 @@
     var AbstractEditor = function(params) {
         var self = this;        
     };
+
+    var isTouchDevice = "ontouchstart" in document.documentElement,
+        downEvent = isTouchDevice ? "touchstart" : "mousedown",
+        upEvent = isTouchDevice ? "touchend" : "mouseup",
+        moveEvent = isTouchDevice ? "touchmove" : "mousemove";
     
     // TODO: this is for a Straight segment.it would be better to have these all available somewjere, keyed
     // by segment type
@@ -59,8 +61,8 @@
             //      x1 = (b2 - b) / (m - m2)
                 _x1 = (b2 -b) / (m - m2),
                 _y1 = (m * _x1) + b,
-                d = jsPlumbGeom.lineLength([ x, y ], [ _x1, _y1 ]),
-                fractionInSegment = jsPlumbGeom.lineLength([ _x1, _y1 ], [ seg[0], seg[1] ]);
+                d = Biltong.lineLength([ x, y ], [ _x1, _y1 ]),
+                fractionInSegment = Biltong.lineLength([ _x1, _y1 ], [ seg[0], seg[1] ]);
             
             out.d = d;
             out.x = _x1;
@@ -88,14 +90,29 @@
         "Flowchart":function(params) {
             AbstractEditor.apply(this, arguments);            
             
-            var jpcl = jsPlumb.CurrentLibrary,
-                documentMouseUp = function(e) {                     
-                    jpcl.removeClass(document.body, params.connection._jsPlumb.instance.dragSelectClass);
+            var clickConsumer = function(conn) {                     
+                    conn._jsPlumb.afterEditClick = function() {
+                        console.log("after edit click");
+                        conn.unbind("click", conn._jsPlumb.afterEditClick);
+                        conn._jsPlumb.afterEditClick = null;
+                        return false;
+                    }; 
+                    conn.bind("click", conn._jsPlumb.afterEditClick, true);                    
+                },
+                documentMouseUp = function(e) {       
+
+                    // an attempt at consuming the click that occurs after this mouseup
+                    // it's not reliable though, as we dont always get a click fired, for some
+                    // reason.
+                    //if (editing)
+                    //    clickConsumer(params.connection);
+
+                    jsPlumbAdapter.removeClass(document.body, params.connection._jsPlumb.instance.dragSelectClass);
                     params.connection._jsPlumb.instance.setConnectionBeingDragged(false);
                     e.stopPropagation();
                     e.preventDefault();
-                    jpcl.unbind(document, "mouseup", documentMouseUp);
-                    jpcl.unbind(document, "mousemove", documentMouseMove);                    
+                    jsPlumb.off(document, upEvent, documentMouseUp);
+                    jsPlumb.off(document, moveEvent, documentMouseMove);                    
                     downAt = null;
                     currentSegments = null;
                     selectedSegment = null; 
@@ -106,14 +123,14 @@
                     params.connection.endpoints[1].setSuspendEvents(false);
                     params.connection.editCompleted();
                     params.connector.justEdited = editing;
-                    editing = false;
+                    editing = false;            
                 },
                 downAt = null,
                 currentSegments = null,
                 selectedSegment = null,
                 segmentCoords = null,
                 editing = false,
-                anchorsMoveable = params.params.anchorsMoveable,
+                anchorsMoveable = true,//params.params.anchorsMoveable,
                 sgn = function(p1, p2) {
                     if (p1[0] == p2[0])
                         return p1[1] < p2[1]  ? 1 : -1;
@@ -141,12 +158,12 @@
                 },
                 // attempt to shift anchor
                 _shiftAnchor = function(endpoint, horizontal, value) {                    
-                    var elementSize = jpcl.getSize(endpoint.element),
+                    var elementSize = jsPlumb.getSize(endpoint.element),
                         sizeValue = elementSize[horizontal ? 1 : 0],
-                        ee = jpcl.getElementObject(endpoint.element),
-                        off = jpcl.getOffset(ee), 
-                        cc = jpcl.getElementObject(params.connector.canvas.parentNode),
-                        co = jpcl.getOffset(cc),
+                        ee = jsPlumb.getElementObject(endpoint.element),
+                        off = jsPlumb.getOffset(ee), 
+                        cc = jsPlumb.getElementObject(params.connector.canvas.parentNode),
+                        co = jsPlumb.getOffset(cc),
                         offValue = off[horizontal ? "top" : "left"] - co[horizontal ? "top" : "left"], 
                         ap = endpoint.anchor.getCurrentLocation({element:endpoint}),
                         desiredLoc = horizontal ? params.connector.y + value : params.connector.x + value;
@@ -259,17 +276,25 @@
                 };
                         
             //bind to mousedown and mouseup, for editing
-            params.connector.bind("mousedown", function(c, e) {
+            params.connector.bind(downEvent, function(c, e) {
                 var x = (e.pageX || e.page.x),
                     y = (e.pageY || e.page.y),
-                    oe = jpcl.getElementObject(params.connection.getConnector().canvas),
-                    o = jpcl.getOffset(oe),                    
+                    oe = jsPlumb.getElementObject(params.connection.getConnector().canvas),
+                    o = jsPlumbAdapter.getOffset(oe, params.connection._jsPlumb.instance),                    
                     minD = Infinity;
+
+                // TODO this is really the way we want to go: get the segment from the connector.
+                // for now it's just here to remind me what to change.
+                var __seg = params.connector.findSegmentForPoint(x-o.left, y-o.top);
+                console.log(__seg);
                 
                 currentSegments = params.connector.getOriginalSegments();
                 _collapseSegments();
                 for (var i = 0; i < currentSegments.length; i++) {                    
                     var _s = findClosestPointOnPath(currentSegments[i], (x - o.left) , (y - o.top), i, params.connector.bounds);
+                    
+                    //var _s = currentSegments[i].findClosestPointOnPath(x - o.left, y - o.top);
+                    
                     if (_s.d < minD) {
                         selectedSegment = _s;
                         segmentCoords = [ _s.s[0], _s.s[1], _s.s[2], _s.s[3] ]; // copy the coords at mousedown
@@ -280,9 +305,9 @@
                 downAt = [ x, y ];
                 
                 if (selectedSegment != null) {                    
-                    jpcl.bind(document, "mouseup", documentMouseUp);
-                    jpcl.bind(document, "mousemove", documentMouseMove);                                      
-                    jpcl.addClass(document.body, params.connection._jsPlumb.instance.dragSelectClass);
+                    jsPlumb.on(document, upEvent, documentMouseUp);
+                    jsPlumb.on(document, moveEvent, documentMouseMove);                                      
+                    jsPlumbAdapter.addClass(document.body, params.connection._jsPlumb.instance.dragSelectClass);
                     params.connection._jsPlumb.instance.setConnectionBeingDragged(true);
                     params.connection.editStarted();                
                     return false;
@@ -297,6 +322,44 @@
             this.justEdited = false;
         }
         return out;
+    };
+
+// ------------------ augment the Connection prototype with the editing stuff --------------------------
+
+    var EDIT_STARTED = "editStarted", EDIT_COMPLETED = "editCompleted", EDIT_CANCELED = "editCanceled";
+
+    jsPlumb.Connection.prototype.setEditable = function(e) {
+        if (this.connector && this.connector.isEditable())
+            this._jsPlumb.editable = e;
+        
+        return this._jsPlumb.editable;
+    };
+
+    jsPlumb.Connection.prototype.isEditable = function() { return this._jsPlumb.editable; };
+
+    jsPlumb.Connection.prototype.editStarted = function() {  
+        this.setSuspendEvents(true);
+        this.fire(EDIT_STARTED, {
+            path:this.connector.getPath()
+        });
+        this._jsPlumb.instance.setHoverSuspended(true);
+    };
+
+    jsPlumb.Connection.prototype.editCompleted = function() {
+        this.fire(EDIT_COMPLETED, {
+            path:this.connector.getPath()
+        });
+        this.setSuspendEvents(false);
+        this._jsPlumb.instance.setHoverSuspended(false);
+        this.setHover(false);
+    };
+
+    jsPlumb.Connection.prototype.editCanceled = function() {
+        this.fire(EDIT_CANCELED, {
+            path:this.connector.getPath()
+        });
+        this._jsPlumb.instance.setHoverSuspended(false);
+        this.setHover(false);
     };
         
 })();
